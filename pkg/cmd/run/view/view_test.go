@@ -19,10 +19,35 @@ func TestNewCmdView(t *testing.T) {
 		wants    ViewOptions
 		wantsErr bool
 	}{
-		// TODO show progress, prompt, exit status, verbose
 		{
 			name:     "blank nontty",
 			wantsErr: true,
+		},
+		{
+			name: "blank tty",
+			tty:  true,
+			wants: ViewOptions{
+				Prompt:       true,
+				ShowProgress: true,
+			},
+		},
+		{
+			name: "exit status",
+			cli:  "-e 1234",
+			wants: ViewOptions{
+				RunID:      "1234",
+				ExitStatus: true,
+			},
+		},
+		{
+			name: "verbosity",
+			cli:  "-v",
+			tty:  true,
+			wants: ViewOptions{
+				Verbose:      true,
+				Prompt:       true,
+				ShowProgress: true,
+			},
 		},
 		{
 			name: "with arg nontty",
@@ -61,6 +86,8 @@ func TestNewCmdView(t *testing.T) {
 				assert.Error(t, err)
 				return
 			}
+
+			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.RunID, gotOpts.RunID)
 			assert.Equal(t, tt.wants.ShowProgress, gotOpts.ShowProgress)
