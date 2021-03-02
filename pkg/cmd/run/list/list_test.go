@@ -80,7 +80,6 @@ func TestNewCmdList(t *testing.T) {
 }
 
 func TestListRun(t *testing.T) {
-
 	testRun := func(name string, id int, s shared.Status, c shared.Conclusion) shared.Run {
 		created, _ := time.Parse("2006-01-02 15:04:05", "2021-02-23 04:51:00")
 		updated, _ := time.Parse("2006-01-02 15:04:05", "2021-02-23 04:55:34")

@@ -202,7 +202,6 @@ func PromptForRun(cs *iostreams.ColorScheme, client *api.Client, repo ghrepo.Int
 	// TODO arbitrary limit
 	runs, err := GetRuns(client, repo, 10)
 	if err != nil {
-		// TODO better error handle
 		return "", err
 	}
 
