@@ -106,9 +106,9 @@ func TestNewCmdView(t *testing.T) {
 }
 
 func TestViewRun(t *testing.T) {
+	created, _ := time.Parse("2006-01-02 15:04:05", "2021-02-23 04:51:00")
+	updated, _ := time.Parse("2006-01-02 15:04:05", "2021-02-23 04:55:34")
 	testRun := func(name string, id int, s shared.Status, c shared.Conclusion) shared.Run {
-		created, _ := time.Parse("2006-01-02 15:04:05", "2021-02-23 04:51:00")
-		updated, _ := time.Parse("2006-01-02 15:04:05", "2021-02-23 04:55:34")
 		return shared.Run{
 			Name:       name,
 			ID:         id,
@@ -118,7 +118,7 @@ func TestViewRun(t *testing.T) {
 			Conclusion: c,
 			Event:      "push",
 			HeadBranch: "trunk",
-			JobsURL:    fmt.Sprintf("runs/%d/jobs", id),
+			JobsURL:    fmt.Sprintf("/runs/%d/jobs", id),
 			HeadCommit: shared.Commit{
 				Message: "cool commit",
 			},
@@ -127,12 +127,12 @@ func TestViewRun(t *testing.T) {
 		}
 	}
 
-	chosenRun := testRun("timed out", 3, shared.Completed, shared.TimedOut)
+	successfulRun := testRun("successful", 3, shared.Completed, shared.Success)
 
 	runs := []shared.Run{
-		testRun("successful", 1, shared.Completed, shared.Success),
+		testRun("timed out", 3, shared.Completed, shared.TimedOut),
 		testRun("in progress", 2, shared.InProgress, ""),
-		chosenRun,
+		successfulRun,
 		testRun("cancelled", 4, shared.Completed, shared.Cancelled),
 		testRun("failed", 5, shared.Completed, shared.Failure),
 		testRun("neutral", 6, shared.Completed, shared.Neutral),
@@ -151,6 +151,13 @@ func TestViewRun(t *testing.T) {
 		wantErr  bool
 		wantOut  string
 	}{
+		// TODO found matching PR
+		// TODO did not find matching PR
+		// TODO failed job
+		// TODO no failed job
+		// TODO verbose
+		// TODO exit status
+		// TODO pass in a run id
 		{
 			name: "prompts for choice",
 			tty:  true,
@@ -162,9 +169,27 @@ func TestViewRun(t *testing.T) {
 					}))
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3"),
-					httpmock.JSONResponse(chosenRun))
-				// TODO jobs
-				// TODO annotations
+					httpmock.JSONResponse(successfulRun))
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestForRun`),
+					httpmock.StringResponse(``))
+				reg.Register(
+					httpmock.REST("GET", "runs/3/jobs"),
+					httpmock.JSONResponse(shared.JobsPayload{
+						Jobs: []shared.Job{
+							{
+								ID:          10,
+								Status:      shared.Completed,
+								Conclusion:  shared.Success,
+								Name:        "cool job",
+								StartedAt:   created,
+								CompletedAt: updated,
+							},
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/check-runs/10/annotations"),
+					httpmock.JSONResponse([]shared.Annotation{}))
 			},
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubOne(2)
@@ -173,7 +198,7 @@ func TestViewRun(t *testing.T) {
 				Prompt:       true,
 				ShowProgress: true,
 			},
-			wantOut: "TODO",
+			wantOut: "\n✓ trunk successful · 3\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job (ID 10)\n\nFor more information about a job, try: gh job view <job-id>\nview this run on GitHub: runs/3\n",
 		},
 	}
 
@@ -182,6 +207,11 @@ func TestViewRun(t *testing.T) {
 		tt.stubs(reg)
 		tt.opts.HttpClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
+		}
+
+		tt.opts.Now = func() time.Time {
+			notnow, _ := time.Parse("2006-01-02 15:04:05", "2021-02-23 05:50:00")
+			return notnow
 		}
 
 		io, _, stdout, _ := iostreams.Test()
